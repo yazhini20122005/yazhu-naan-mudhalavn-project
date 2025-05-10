@@ -1,0 +1,119 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
+import re
+from collections import Counter
+
+# Loading the dataset
+def load_data(file_path):
+    try:
+        df = pd.read_csv(file_path, header=None, names=['ID', 'Entity', 'Sentiment', 'Tweet'], quotechar='"', skipinitialspace=True)
+        return df
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        return None
+
+# Cleaning the dataset
+def clean_data(df):
+    df = df.dropna(subset=['ID', 'Entity', 'Sentiment', 'Tweet'])
+    df = df[df['Tweet'].str.strip() != '']
+    valid_sentiments = ['Positive', 'Negative', 'Neutral', 'Irrelevant']
+    df['Sentiment'] = df['Sentiment'].str.capitalize()
+    df = df[df['Sentiment'].isin(valid_sentiments)]
+    df['Entity'] = df['Entity'].str.strip()
+    df['Tweet'] = df['Tweet'].str.strip()
+    return df
+
+# Analyzing sentiment distribution
+def analyze_sentiment(df):
+    sentiment_counts = df.groupby(['Entity', 'Sentiment']).size().unstack(fill_value=0)
+    return sentiment_counts
+
+# Generating word cloud data
+def generate_word_cloud_data(tweets, sentiment):
+    words = []
+    for tweet in tweets[tweets['Sentiment'] == sentiment]['Tweet']:
+        if isinstance(tweet, str):
+            cleaned = re.sub(r"[^a-zA-Z\s']", '', tweet.lower())
+            words.extend([word for word in cleaned.split() if len(word) > 3])
+    word_counts = Counter(words)
+    return dict(word_counts.most_common(50))
+
+# Plotting bar chart
+def plot_bar_chart(sentiment_counts):
+    plt.figure(figsize=(10, 6))
+    sentiment_counts.plot(kind='bar', stacked=False, color=['#4CAF50', '#F44336', '#2196F3', '#FF9800'])
+    plt.title('Sentiment Distribution by Entity')
+    plt.xlabel('Entity')
+    plt.ylabel('Number of Tweets')
+    plt.legend(title='Sentiment')
+    plt.tight_layout()
+    plt.show()
+
+# Plotting pie charts
+def plot_pie_charts(sentiment_counts):
+    for entity in sentiment_counts.index:
+        plt.figure(figsize=(6, 6))
+        counts = sentiment_counts.loc[entity]
+        plt.pie(counts, labels=counts.index, autopct='%1.1f%%', colors=['#4CAF50', '#F44336', '#2196F3', '#FF9800'])
+        plt.title(f'Sentiment Proportions for {entity}')
+        plt.tight_layout()
+        plt.show()
+
+# Plotting word clouds for Borderlands
+def plot_word_clouds(df):
+    # Positive word cloud
+    positive_words = generate_word_cloud_data(df[df['Entity'] == 'Borderlands'], 'Positive')
+    if positive_words:
+        wc_positive = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(positive_words)
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wc_positive, interpolation='bilinear')
+        plt.axis('off')
+        plt.title('Word Cloud: Positive Borderlands Tweets')
+        plt.show()
+
+    # Negative word cloud
+    negative_words = generate_word_cloud_data(df[df['Entity'] == 'Borderlands'], 'Negative')
+    if negative_words:
+        wc_negative = WordCloud(width=800, height=400, background_color='white').generate_from_frequencies(negative_words)
+        plt.figure(figsize=(10, 5))
+        plt.imshow(wc_negative, interpolation='bilinear')
+        plt.axis('off')
+        plt.title('Word Cloud: Negative Borderlands Tweets')
+        plt.show()
+
+# Main function
+def main():
+    file_path = 'twitter_training.csv'
+    df = load_data(file_path)
+    if df is None:
+        return
+
+    df = clean_data(df)
+    if df.empty:
+        print("No valid data after cleaning.")
+        return
+
+    sentiment_counts = analyze_sentiment(df)
+    print("\nSentiment Distribution:")
+    print(sentiment_counts)
+
+    # Interesting fact
+    borderlands_positive = sentiment_counts.loc['Borderlands', 'Positive']
+    borderlands_total = sentiment_counts.loc['Borderlands'].sum()
+    positive_pct = (borderlands_positive / borderlands_total * 100) if borderlands_total > 0 else 0
+    print(f"\nInteresting Fact: {positive_pct:.1f}% of Borderlands tweets are Positive, reflecting strong fan enthusiasm.")
+
+    # Show visualizations
+    print("\nVisualizations:")
+    plot_bar_chart(sentiment_counts)
+    plot_pie_charts(sentiment_counts)
+    plot_word_clouds(df)
+
+# Run the script
+if __name__ == "__main__":
+    main()
